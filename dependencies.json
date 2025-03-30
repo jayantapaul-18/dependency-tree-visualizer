@@ -1,0 +1,58 @@
+{
+    "name": "ECommercePlatform",
+    "type": "System",
+    "description": "Main e-commerce platform",
+    "dependencies": [
+      {
+        "name": "OrderService",
+        "type": "Microservice",
+        "description": "Handles order processing",
+        "dependencies": [
+          {
+            "name": "OrderDB",
+            "type": "Database",
+            "description": "PostgreSQL database for orders"
+          },
+          {
+            "name": "PaymentAPI",
+            "type": "API",
+            "description": "External payment processor",
+            "dependencies": [
+              {
+                "name": "AuthProxy",
+                "type": "Proxy",
+                "description": "Authentication proxy service"
+              }
+            ]
+          },
+          {
+            "name": "OrderQueue",
+            "type": "Queue",
+            "description": "RabbitMQ queue for order processing"
+          }
+        ]
+      },
+      {
+        "name": "ProductCatalog",
+        "type": "Service",
+        "description": "Product information service",
+        "dependencies": [
+          {
+            "name": "ProductDB",
+            "type": "Database",
+            "description": "MongoDB product database"
+          },
+          {
+            "name": "ImageCache",
+            "type": "Cache",
+            "description": "Redis cache for product images"
+          }
+        ]
+      },
+      {
+        "name": "WebUI",
+        "type": "UI",
+        "description": "Customer-facing web interface"
+      }
+    ]
+  }

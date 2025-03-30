@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dependency Tree Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+            background-color: #f5f5f5;
+            color: #333333;
+        }
+        #graph {
+            width: 100%;
+            height: calc(100vh - 120px);
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #ffffff;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .link {
+            fill: none;
+            stroke: #999;
+            stroke-width: 1.5px;
+        }
+        .tooltip {
+            position: absolute;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #333333;
+            border-radius: 6px;
+            pointer-events: none;
+            font-size: 14px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border: 1px solid #ddd;
+            max-width: 300px;
+        }
+        .legend {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-right: 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .legend-text {
+            font-size: 14px;
+        }
+        h1 {
+            margin-top: 0;
+            color: #333333;
+        }
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background: #e0e0e0;
+            color: #333333;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #d0d0d0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dependency Tree Visualization</h1>
+    <div class="controls">
+        <button id="zoom-in">Zoom In</button>
+        <button id="zoom-out">Zoom Out</button>
+        <button id="reset">Reset View</button>
+    </div>
+    <div class="legend">
+        <div class="legend-item"><span class="legend-color" style="background-color: #64B5F6;"></span><span class="legend-text">Service</span></div>
+        <div class="legend-item"><span class="legend-color" style="background-color: #4DB6AC;"></span><span class="legend-text">Database</span></div>
+        <div class="legend-item"><span class="legend-color" style="background-color: #FF8A65;"></span><span class="legend-text">API</span></div>
+        <div class="legend-item"><span class="legend-color" style="background-color: #BA68C8;"></span><span class="legend-text">Proxy</span></div>
+        <div class="legend-item"><span class="legend-color" style="background-color: #FFD54F;"></span><span class="legend-text">Queue</span></div>
+        <div class="legend-item"><span class="legend-color" style="background-color: #AED581;"></span><span class="legend-text">Cache</span></div>
+        <div class="legend-item"><span class="legend-color" style="background-color: #7986CB;"></span><span class="legend-text">UI</span></div>
+    </div>
+    <div id="graph"></div>
+    <div class="tooltip" style="opacity: 0;"></div>
+
+    <script>
+        const data = {
+            nodes: [{"id": "4411984000", "name": "ECommercePlatform", "type": "system", "description": "Main e-commerce platform", "shape": "default"}, {"id": "4411948160", "name": "OrderService", "type": "microservice", "description": "Handles order processing", "shape": "microservice"}, {"id": "4411947648", "name": "OrderDB", "type": "database", "description": "PostgreSQL database for orders", "shape": "database"}, {"id": "4408174080", "name": "PaymentAPI", "type": "api", "description": "External payment processor", "shape": "api"}, {"id": "4411948736", "name": "AuthProxy", "type": "proxy", "description": "Authentication proxy service", "shape": "proxy"}, {"id": "4411946944", "name": "OrderQueue", "type": "queue", "description": "RabbitMQ queue for order processing", "shape": "queue"}, {"id": "4411948096", "name": "ProductCatalog", "type": "service", "description": "Product information service", "shape": "service"}, {"id": "4411948224", "name": "ProductDB", "type": "database", "description": "MongoDB product database", "shape": "database"}, {"id": "4411948288", "name": "ImageCache", "type": "cache", "description": "Redis cache for product images", "shape": "cache"}, {"id": "4411948352", "name": "WebUI", "type": "ui", "description": "Customer-facing web interface", "shape": "ui"}],
+            links: [{"source": "4411984000", "target": "4411948160", "type": "depends_on"}, {"source": "4411948160", "target": "4411947648", "type": "depends_on"}, {"source": "4411948160", "target": "4408174080", "type": "depends_on"}, {"source": "4408174080", "target": "4411948736", "type": "depends_on"}, {"source": "4411948160", "target": "4411946944", "type": "depends_on"}, {"source": "4411984000", "target": "4411948096", "type": "depends_on"}, {"source": "4411948096", "target": "4411948224", "type": "depends_on"}, {"source": "4411948096", "target": "4411948288", "type": "depends_on"}, {"source": "4411984000", "target": "4411948352", "type": "depends_on"}]
+        };
+
+        const colorMap = {
+            'database': '#4DB6AC',
+            'api': '#FF8A65',
+            'service': '#64B5F6',
+            'proxy': '#BA68C8',
+            'queue': '#FFD54F',
+            'cache': '#AED581',
+            'ui': '#7986CB',
+            'microservice': '#4DD0E1',
+            'lambda': '#F06292',
+            'container': '#81C784',
+            'default': '#E0E0E0'
+        };
+
+        const darkColorMap = {
+            'database': '#00695C',
+            'api': '#BF360C',
+            'service': '#0D47A1',
+            'proxy': '#6A1B9A',
+            'queue': '#FF8F00',
+            'cache': '#558B2F',
+            'ui': '#3949AB',
+            'microservice': '#00838F',
+            'lambda': '#AD1457',
+            'container': '#2E7D32',
+            'default': '#424242'
+        };
+
+        const theme = 'light';
+        const currentColorMap = theme === 'dark' ? darkColorMap : colorMap;
+
+        const width = document.getElementById('graph').clientWidth;
+        const height = document.getElementById('graph').clientHeight;
+
+        const svg = d3.select("#graph")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        const g = svg.append("g");
+        let zoom = d3.zoom()
+            .scaleExtent([0.1, 8])
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+
+        svg.call(zoom);
+
+        const simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links).id(d => d.id).distance(150))
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("x", d3.forceX(width / 2).strength(0.05))
+            .force("y", d3.forceY(height / 2).strength(0.05))
+            .force("collision", d3.forceCollide().radius(80));
+
+        const link = g.append("g")
+            .selectAll("path")
+            .data(data.links)
+            .enter().append("path")
+            .attr("class", "link")
+            .attr("stroke-dasharray", d => d.type === 'optional' ? '5,5' : '0');
+
+        // Define arrow markers
+        svg.append("defs").selectAll("marker")
+            .data(["end"])
+            .enter().append("marker")
+            .attr("id", d => d)
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 25)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", "#777");
+
+        // Apply markers to links
+        link.attr("marker-end", "url(#end)");
+
+        const node = g.append("g")
+            .selectAll("g")
+            .data(data.nodes)
+            .enter().append("g")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        // Draw custom shapes based on node type
+        node.each(function(d) {
+            const group = d3.select(this);
+            const nodeType = d.type.toLowerCase();
+            const color = currentColorMap[nodeType] || currentColorMap['default'];
+            const textColor = theme === 'dark' ? '#ffffff' : '#333333';
+            
+            // Draw different shapes based on node type
+            switch(d.shape) {
+                case 'database':
+                    // Cylinder shape for database
+                    group.append("ellipse")
+                        .attr("cx", 0)
+                        .attr("cy", -15)
+                        .attr("rx", 50)
+                        .attr("ry", 15)
+                        .attr("fill", color)
+                        .attr("stroke", theme === 'dark' ? '#ffffff' : '#555555');
+                    
+                    group.append("rect")
+                        .attr("x", -50)
+                        .attr("y", -15)
+                        .attr("width", 100)
+                        .attr("height", 30)
+                        .attr("fill", color)
+                        .attr("stroke", theme === 'dark' ? '#ffffff' : '#555555');
+                    
+                    group.append("ellipse")
+                        .attr("cx", 0)
+                        .attr("cy", 15)
+                        .attr("rx", 50)
+                        .attr("ry", 15)
+                        .attr("fill", color)
+                        .attr("stroke", theme === 'dark' ? '#ffffff' : '#555555')
+                        .attr("stroke-dasharray", "2,2");
+                    break;
+                
+                case 'api':
+                    // Rounded rectangle for API
+                    group.append("rect")
+                        .attr("x", -50)
+                        .attr("y", -25)
+                        .attr("width", 100)
+                        .attr("height", 50)
+                        .attr("rx", 10)
+                        .attr("ry", 10)
+                        .attr("fill", color)
+                        .attr("stroke", theme === 'dark' ? '#ffffff' : '#555555');
+                    break;
+                
+                case 'proxy':
+                    // Diamond shape for proxy
+                    group.append("polygon")
+                        .attr("points", "-50,0 0,-25 50,0 0,25")
+                        .attr("fill", color)
+                        .attr("stroke", theme === 'dark' ? '#ffffff' : '#555555');
+                    break;
+                
+                case 'queue':
+                    // Note shape for queue
+                    group.append("path")
+                        .attr("d", "M-40,-20 L40,-20 L40,10 L20,20 L-40,20 Z")
+                        .attr("fill", color)
+                        .attr("stroke", theme === 'dark' ? '#ffffff' : '#555555');
+                    break;
+                
+                default:
+                    // Default rectangle for other types
+                    group.append("rect")
+                        .attr("x", -50)
+                        .attr("y", -25)
+                        .attr("width", 100)
+                        .attr("height", 50)
+                        .attr("rx", 5)
+                        .attr("ry", 5)
+                        .attr("fill", color)
+                        .attr("stroke", theme === 'dark' ? '#ffffff' : '#555555');
+            }
+            
+            // Add text label
+            group.append("text")
+                .attr("dy", 5)
+                .attr("text-anchor", "middle")
+                .attr("fill", textColor)
+                .style("font-weight", "bold")
+                .text(d => d.name)
+                .call(wrap, 90);
+        });
+
+        const tooltip = d3.select(".tooltip");
+
+        node.on("mouseover", function(event, d) {
+                tooltip.transition()
+                    .duration(200)
+                    .style("opacity", .95);
+                tooltip.html(`
+                    <div style="margin-bottom: 5px; font-size: 16px; font-weight: bold; color: ${currentColorMap[d.type.toLowerCase()] || currentColorMap['default']}">
+                        ${d.name}
+                    </div>
+                    <div><strong>Type:</strong> ${d.type}</div>
+                    <div><strong>Description:</strong> ${d.description || 'No description available'}</div>
+                `)
+                    .style("left", (event.pageX + 15) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+            })
+            .on("mouseout", function() {
+                tooltip.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+            });
+
+        simulation.on("tick", () => {
+            link.attr("d", d => {
+                const dx = d.target.x - d.source.x;
+                const dy = d.target.y - d.source.y;
+                const dr = Math.sqrt(dx * dx + dy * dy);
+                return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+            });
+
+            node.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // Text wrapping function
+        function wrap(text, width) {
+            text.each(function() {
+                const text = d3.select(this);
+                const words = text.text().split(/\s+/).reverse();
+                let word;
+                let line = [];
+                let lineNumber = 0;
+                const lineHeight = 1.1;
+                const y = text.attr("y");
+                const dy = parseFloat(text.attr("dy"));
+                let tspan = text.text(null).append("tspan")
+                    .attr("x", 0)
+                    .attr("y", y)
+                    .attr("dy", dy + "px");
+                
+                while (word = words.pop()) {
+                    line.push(word);
+                    tspan.text(line.join(" "));
+                    if (tspan.node().getComputedTextLength() > width) {
+                        line.pop();
+                        tspan.text(line.join(" "));
+                        line = [word];
+                        tspan = text.append("tspan")
+                            .attr("x", 0)
+                            .attr("y", y)
+                            .attr("dy", ++lineNumber * lineHeight + dy + "px")
+                            .text(word);
+                    }
+                }
+            });
+        }
+
+        // Zoom controls
+        d3.select("#zoom-in").on("click", function() {
+            svg.transition().call(zoom.scaleBy, 1.2);
+        });
+
+        d3.select("#zoom-out").on("click", function() {
+            svg.transition().call(zoom.scaleBy, 0.8);
+        });
+
+        d3.select("#reset").on("click", function() {
+            svg.transition()
+                .duration(750)
+                .call(zoom.transform, d3.zoomIdentity);
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            const newWidth = document.getElementById('graph').clientWidth;
+            const newHeight = document.getElementById('graph').clientHeight;
+            svg.attr("width", newWidth).attr("height", newHeight);
+            simulation.force("x", d3.forceX(newWidth / 2).strength(0.05));
+            simulation.force("y", d3.forceY(newHeight / 2).strength(0.05));
+            simulation.alpha(0.3).restart();
+        });
+    </script>
+</body>
+</html>
